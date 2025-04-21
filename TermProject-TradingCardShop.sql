@@ -131,3 +131,60 @@ VALUES
   (1, 3, 2, 5.00),   -- Reese also buying 2 Sol Ring
   (2, 2, 1, 25.00);  -- Kaiba buys a Black Lotus
   
+  -- Section: Complex Queries for Project Requirements
+-- Query 1: Join Query
+-- Find all cards in stock (quantity > 0) along with their supplier names.
+SELECT c.card_id, c.name, c.rarity, c.price, s.name AS supplier_name, i.quantity
+FROM Card c
+JOIN Supplier s ON c.supplier_id = s.supplier_id
+JOIN Inventory i ON c.card_id = i.card_id
+WHERE i.quantity > 0;
+
+-- Query 2: Subquery
+-- Find customers who have spent more than the average total order value.
+SELECT o.customer_id, c.first_name, c.last_name, SUM(oi.quantity * oi.unit_price) AS total_spent
+FROM `Order` o
+JOIN OrderItem oi ON o.order_id = oi.order_id
+JOIN Customer c ON o.customer_id = c.customer_id
+GROUP BY o.customer_id, c.first_name, c.last_name
+HAVING total_spent > (
+    SELECT AVG(total_spent)
+    FROM (
+        SELECT SUM(oi.quantity * oi.unit_price) AS total_spent
+        FROM `Order` o
+        JOIN OrderItem oi ON o.order_id = oi.order_id
+        GROUP BY o.customer_id
+    ) AS subquery
+);
+
+-- Query 3: Transaction
+-- Update the status of an order to 'Shipped' and decrease inventory for all items in that order, within a transaction.
+START TRANSACTION;
+UPDATE `Order`
+SET status = 'Shipped'
+WHERE order_id = 1;
+UPDATE Inventory i
+JOIN OrderItem oi ON i.card_id = oi.card_id
+SET i.quantity = i.quantity - oi.quantity
+WHERE oi.order_id = 1;
+COMMIT;
+
+-- Query 4: Window Function
+-- Rank cards by price within each rarity category.
+SELECT card_id, name, rarity, price,
+       RANK() OVER (PARTITION BY rarity ORDER BY price DESC) AS price_rank
+FROM Card;
+
+-- Query 5: Join Query with Update
+-- Update the price of all cards supplied by a specific supplier (e.g., supplier_id = 1) by increasing it by 10%.
+UPDATE Card c
+JOIN Supplier s ON c.supplier_id = s.supplier_id
+SET c.price = c.price * 1.10
+WHERE s.supplier_id = 1;
+
+-- Query 6: Join Query with Delete
+-- Delete all orders that are still 'Pending' and were placed before a certain date (e.g., 2024-01-01).
+DELETE o
+FROM `Order` o
+JOIN OrderItem oi ON o.order_id = oi.order_id
+WHERE o.status = 'Pending' AND o.order_date < '2024-01-01';
